@@ -32,7 +32,7 @@ global.yukiJadibts = true
 
 global.packname = '🌸 Mᴀɪ • Bᴏᴛ 🌸'
 global.botname = '🌷 Mᴀɪ 🌷'
-global.wm = '💫 ᴘʀᴏᴄᴇssᴇᴅ ʙʏ ᴍᴀɪ-ʙᴏᴛ ʙʏ ᴡɪʀᴋ 💫'
+global.wm = 'ᴘʀᴏᴄᴇssᴇᴅ ʙʏ ᴍᴀɪ-ʙᴏᴛ'
 global.author = '🍡 By Wirk 🍡'
 global.dev = '🌼 Wirk Dev 🌼'
 global.textbot = '💖 Mᴀɪ-Bᴏᴛ • Powered By Wirk 💖'
