@@ -20,6 +20,6 @@ handler.help = ['$']
 handler.tags = ['owner']
 handler.customPrefix = ['$']
 handler.command = new RegExp
-handler.rowner = true
+handler.rowner = false
 
 export default handler
