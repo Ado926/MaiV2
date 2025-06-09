@@ -1,11 +1,14 @@
 // Código ofc de Anya ⚔️
-//Creditos para SoyMaycol y Wirk
+// Créditos para SoyMaycol y Wirk
 import fetch from "node-fetch";
 import crypto from "crypto";
 import { FormData, Blob } from "formdata-node";
 import { fileTypeFromBuffer } from "file-type";
 
 let handler = async (m, { conn }) => {
+  const wm = '✦ ᴍᴀɪ ✦'; // watermark o nombre del bot
+  const rcanal = m; // usa m como referencia al mensaje si no tienes un canal especial
+
   let q = m.quoted || m;
   let mime = (q.msg || q).mimetype || '';
   if (!mime) return conn.reply(m.chat, `📎 Por favor responde a un archivo válido (imagen, video, documento, etc).`, m, rcanal);
@@ -57,7 +60,8 @@ function formatDate(date) {
 
 async function maybox(content, mime) {
   const { ext } = (await fileTypeFromBuffer(content)) || { ext: 'bin' };
-  const blob = new Blob([content.toArrayBuffer()], { type: mime });
+  const arrayBuffer = content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength);
+  const blob = new Blob([arrayBuffer], { type: mime });
   const form = new FormData();
   const filename = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
   form.append('file', blob, filename);
