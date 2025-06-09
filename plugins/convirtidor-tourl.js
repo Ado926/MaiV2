@@ -1,68 +1,74 @@
+// Código ofc de Anya ⚔️
+//Creditos para SoyMaycol y Wirk
 import fetch from "node-fetch";
 import crypto from "crypto";
 import { FormData, Blob } from "formdata-node";
 import { fileTypeFromBuffer } from "file-type";
 
-const handler = async (m, { conn }) => {
-let q = m.quoted ? m.quoted : m;
-  let mime = (q.msg || q).mimetype || "";
-  if (!mime) return m.reply("No media found", null, { quoted: fkontak });
-  let media = await q.download();
-let link = await catbox(media);
-  let caption = `🌸 *L I N K :*
- \`\`\`• ${link}\`\`\`
-📊 *TAMAÑO:* ${formatBytes(media.length)}
-📛 *Expired:* "No Expiry Date" 
-`;
+let handler = async (m, { conn }) => {
+  let q = m.quoted || m;
+  let mime = (q.msg || q).mimetype || '';
+  if (!mime) return conn.reply(m.chat, `📎 Por favor responde a un archivo válido (imagen, video, documento, etc).`, m, rcanal);
 
-  await m.reply(caption);
-}
-handler.command = handler.help = ['tourl']
-handler.tags = ['tools']
-export default handler
+  await m.react('🕒');
 
+  try {
+    let media = await q.download();
+    let linkData = await maybox(media, mime);
 
-function formatBytes(bytes) {
-  if (bytes === 0) {
-    return "0 B";
+    if (!linkData?.data?.url) throw '❌ No se pudo subir el archivo';
+
+    let info = linkData.data;
+    let txt = `
+🌸｡･:*:･ﾟ★ 𝚆𝚒𝚛𝚔𝚜𝚒 𝙱𝚘𝚡 ★･ﾟ:*:･｡🌸
+
+📁 *Nombre:* ${info.originalName}
+📦 *Peso:* ${formatBytes(info.size)}
+🗓️ *Fecha:* ${formatDate(info.uploadedAt)}
+🔗 *Link:* ${info.url}
+
+🌐 *Processed By ${wm}*`;
+
+    await conn.sendFile(m.chat, media, info.fileName, txt, m, rcanal);
+    await m.react('✅');
+  } catch (err) {
+    console.error(err);
+    await m.react('❌');
+    await conn.reply(m.chat, `🚫 Hubo un error al subir el archivo a WirksiBox. Intenta de nuevo más tarde.`, m, rcanal);
   }
-  const sizes = ["B", "KB", "MB", "GB", "TB"];
+};
+
+handler.help = ['tourl'];
+handler.tags = ['tools'];
+handler.command = ['wirksibox', 'tourl'];
+export default handler;
+
+// --- Funciones auxiliares ---
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
   return `${(bytes / 1024 ** i).toFixed(2)} ${sizes[i]}`;
 }
 
+function formatDate(date) {
+  return new Date(date).toLocaleString('es-ES', { timeZone: 'America/Tegucigalpa' });
+}
 
-/**
- * Upload image to catbox
- * Supported mimetype:
- * - `image/jpeg`
- * - `image/jpg`
- * - `image/png`s
- * - `image/webp`
- * - `video/mp4`
- * - `video/gif`
- * - `audio/mpeg`
- * - `audio/opus`
- * - `audio/mpa`
- * @param {Buffer} buffer Image Buffer
- * @return {Promise<string>}
- */
-async function catbox(content) {
-  const { ext, mime } = (await fileTypeFromBuffer(content)) || {};
+async function maybox(content, mime) {
+  const { ext } = (await fileTypeFromBuffer(content)) || { ext: 'bin' };
   const blob = new Blob([content.toArrayBuffer()], { type: mime });
-  const formData = new FormData();
-  const randomBytes = crypto.randomBytes(5).toString("hex");
-  formData.append("reqtype", "fileupload");
-  formData.append("fileToUpload", blob, randomBytes + "." + ext);
+  const form = new FormData();
+  const filename = `${Date.now()}-${crypto.randomBytes(3).toString('hex')}.${ext}`;
+  form.append('file', blob, filename);
 
-  const response = await fetch("https://catbox.moe/user/api.php", {
-    method: "POST",
-    body: formData,
+  const res = await fetch('https://wirksibox.onrender.com/api/upload', {
+    method: 'POST',
+    body: form,
     headers: {
-      "User-Agent":
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36",
-    },
+      'User-Agent': 'AnyaForger',
+    }
   });
 
-  return await response.text();
+  return await res.json();
 }
