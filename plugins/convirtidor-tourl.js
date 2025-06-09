@@ -22,8 +22,7 @@ let handler = async (m, { conn }) => {
     if (!linkData?.data?.url) throw '❌ No se pudo subir el archivo';
 
     let info = linkData.data;
-    let txt = `
-🌸｡･:*:･ﾟ★ 𝚆𝚒𝚛𝚔𝚜𝚒 𝙱𝚘𝚡 ★･ﾟ:*:･｡🌸
+    let txt = `･:*:･ﾟ★ 𝚆𝚒𝚛𝚔𝚜𝚒 𝙱𝚘𝚡 ★･ﾟ:*:
 
 📁 *Nombre:* ${info.originalName}
 📦 *Peso:* ${formatBytes(info.size)}
