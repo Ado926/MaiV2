@@ -1,82 +1,62 @@
 import fetch from 'node-fetch';
-import yts from 'yt-search';
 
-let handler = async (m, { conn: star, args, usedPrefix, command }) => {
-  if (!args || !args[0]) {
-    return star.reply(
-      m.chat,
-      `✦ *¡Ingresa el texto o enlace del vídeo de YouTube!*\n\n» *Ejemplo:*\n> *${usedPrefix + command}* Canción de ejemplo`,
-      m
-    );
-  }
+const ENCRYPTED_SEARCH_API = 'aHR0cDovLzE3My4yMDguMjAwLjIyNzozMjY5L3NlYXJjaF95b3V0dWJlP3F1ZXJ5PQ==';
+const ENCRYPTED_DOWNLOAD_VIDEO_API = 'aHR0cDovLzE3My4yMDguMjAwLjIyNzozMjY5L2Rvd25sb2FkX3ZpZGVvP3VybD0=';
 
-  await m.react('🕓');
+function decryptBase64(str) {
+  return Buffer.from(str, 'base64').toString();
+}
+
+let handler = async (m, { text, conn, command }) => {
+  if (!text) return m.reply('🔍 Ingresa el nombre del video. Ejemplo: *.play2 Usewa Ado*');
 
   try {
-    let query = args.join(' ');
-    let isUrl = query.match(/youtu/gi);
+    const searchAPI = decryptBase64(ENCRYPTED_SEARCH_API);
+    const downloadVideoAPI = decryptBase64(ENCRYPTED_DOWNLOAD_VIDEO_API);
 
-    let video;
-    if (isUrl) {
-      let ytres = await yts({ videoId: query.split('v=')[1] });
-      video = ytres.videos[0];
-    } else {
-      let ytres = await yts(query);
-      video = ytres.videos[0];
-      if (!video) {
-        return star.reply(m.chat, '✦ *Video no encontrado.*', m).then(() => m.react('✖️'));
-      }
+    const searchRes = await fetch(`${searchAPI}${encodeURIComponent(text)}`);
+    const searchJson = await searchRes.json();
+
+    if (!searchJson.results || !searchJson.results.length) {
+      return m.reply('⚠️ No se encontraron resultados para tu búsqueda.');
     }
 
-    let { title, thumbnail, timestamp, views, ago, url, author } = video;
+    const video = searchJson.results[0];
+    const thumb = video.thumbnails.find(t => t.width === 720)?.url || video.thumbnails[0]?.url;
+    const videoTitle = video.title;
+    const videoUrl = video.url;
+    const duration = Math.floor(video.duration);
 
-    let api = await fetch(`https://api.siputzx.my.id/api/d/ytmp4?url=${url}`);
-    let json = await api.json();
-    let { data } = json;
+    const msgInfo = `
+🎬 *Título:* ${videoTitle}
+📺 *Canal:* ${video.channel}
+⏱️ *Duración:* ${duration}s
+👀 *Vistas:* ${video.views.toLocaleString()}
+🔗 *URL:* ${videoUrl}
+_Enviando video un momento soy lenta (˶˃ ᵕ ˂˶)..._
+`.trim();
 
-    if (!data || !data.dl) {
-      return star.reply(m.chat, '✦ *Error al obtener el enlace de descarga desde la API.*', m).then(() => m.react('✖️'));
-    }
+    await conn.sendMessage(m.chat, { image: { url: thumb }, caption: msgInfo }, { quoted: m });
 
-    let { dl: downloadUrl, size: sizeHumanReadable } = data;
+    const downloadRes = await fetch(`${downloadVideoAPI}${encodeURIComponent(videoUrl)}`);
+    const downloadJson = await downloadRes.json();
 
-    let txt = `➪ Descargando › *${title}*\n\n`;
-    txt += `> ✩ Canal › *${author.name}*\n`;
-    txt += `> ⴵ Duración › *${timestamp}*\n`;
-    txt += `> ☄︎ Vistas › *${views}*\n`;
-    txt += `> ☁︎ Publicado › *${ago}*\n`;
-    txt += `> ❑ Enlace › *${url}*\n`;
+    if (!downloadJson.file_url) return m.reply('❌ No se pudo descargar el video.');
 
-    await star.sendFile(m.chat, thumbnail, 'thumbnail.jpg', txt, m);
+    await conn.sendMessage(m.chat, {
+      video: { url: downloadJson.file_url },
+      mimetype: 'video/mp4',
+      fileName: `${downloadJson.title}.mp4`
+    }, { quoted: m });
 
-    // Convertimos duración a minutos
-    let durationMinutes = 0;
-    if (timestamp.includes(':')) {
-      let parts = timestamp.split(':').map(Number).reverse();
-      durationMinutes = parts[0] / 60 + (parts[1] || 0) + (parts[2] || 0) * 60;
-    }
-
-    // Lógica para tipo de mensaje
-    let isShort = durationMinutes <= 11;
-    let type = isShort ? 'video' : 'document';
-
-    await star.sendMessage(
-      m.chat,
-      {
-        [type]: { url: downloadUrl },
-        mimetype: 'video/mp4',
-        fileName: `${title}.mp4`
-      },
-      { quoted: m }
-    );
-
-    await m.react('📄');
-  } catch (error) {
-    console.error(error);
-    await m.react('✖️');
-    star.reply(m.chat, '✦ *Ocurrió un error al procesar tu solicitud. Intenta nuevamente más tarde.*', m);
+  } catch (e) {
+    console.error(e);
+    m.reply('❌ Error al procesar tu solicitud.');
   }
 };
 
-handler.command = ['play11', 'play2'];
+handler.command = ['play2','mp4','ytmp4','playmp4'];
+handler.help = ['play2 <video>'];
+handler.tags = ['downloader'];
+
 export default handler;
