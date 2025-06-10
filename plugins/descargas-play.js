@@ -1,61 +1,106 @@
-import fetch from 'node-fetch';
+import Starlights from '@StarlightsTeam/Scraper'
+import yts from 'yt-search'
+import fetch from 'node-fetch'
 
-const ENCRYPTED_SEARCH_API = 'aHR0cDovLzE3My4yMDguMjAwLjIyNzozMjY5L3NlYXJjaF95b3V0dWJlP3F1ZXJ5PQ==';
-const ENCRYPTED_DOWNLOAD_VIDEO_API = 'aHR0cDovLzE3My4yMDguMjAwLjIyNzozMjY5L2Rvd25sb2FkX3ZpZGVvP3VybD0=';
+let handler = async (m, { conn, args, usedPrefix, text, command }) => {
+  let formatos = ["mp3", "mp4", "mp3doc", "mp4doc"]
+  let [formato, ...busqueda] = text.split(" ")
 
-function decryptBase64(str) {
-return Buffer.from(str, 'base64').toString();
+  if (!formatos.includes(formato)) {
+    return conn.reply(
+      m.chat,
+      `┌──〔 *Formato inválido* 〕──✿\n` +
+      `│ 🧩 *Usa el comando así:*\n` +
+      `│ ${usedPrefix + command} mp3 Alan Walker\n` +
+      `│\n` +
+      `│ ✨ *Formatos disponibles:*\n` +
+      `│ 🎧 mp3 (audio)\n` +
+      `│ 📄 mp3doc (audio en doc)\n` +
+      `│ 🎥 mp4 (video)\n` +
+      `│ 📄 mp4doc (video en doc)\n` +
+      `└───────────────♡`,
+      m, rcanal
+    )
+  }
+
+  if (!busqueda.length) {
+    return conn.reply(
+      m.chat,
+      `┌──〔 *Falta la búsqueda* 〕──✿\n` +
+      `│ 🔍 Escribe el título o nombre del video\n` +
+      `│\n` +
+      `│ 🧸 *Ejemplo:*\n` +
+      `│ ${usedPrefix + command} mp4 Aimer - Brave Shine\n` +
+      `└───────────────♡`,
+      m, rcanal
+    )
+  }
+
+  await m.react('⌛')
+
+  let res = await yts(busqueda.join(" "))
+  let video = res.videos[0]
+
+  let caption = `┌──〔 🎶 *Resultado encontrado* 〕──✿\n`
+  caption += `│ 💿 *Título:* ${video.title}\n`
+  caption += `│ ⏱️ *Duración:* ${video.timestamp}\n`
+  caption += `│ 👁️ *Vistas:* ${formatNumber(video.views)}\n`
+  caption += `│ 🎤 *Autor:* ${video.author.name}\n`
+  caption += `│ 📅 *Publicado:* ${eYear(video.ago)}\n`
+  caption += `│ 🔗 *Link:* https://youtu.be/${video.videoId}\n`
+  caption += `└───────────────♡\n\n`
+  caption += `🌟 *Enviando archivo... espera un momento, ten paciencia :)*`
+
+  await conn.sendFile(m.chat, video.thumbnail, 'thumb.jpg', caption, m, rcanal)
+
+  try {
+    let data = formato.includes('mp3') ? await Starlights.ytmp3(video.url) : await Starlights.ytmp4(video.url)
+    let isDoc = formato.includes('doc')
+    let mimetype = formato.includes('mp3') ? 'audio/mpeg' : 'video/mp4'
+
+    await conn.sendMessage(
+      m.chat,
+      {
+        [isDoc ? 'document' : formato.includes('mp3') ? 'audio' : 'video']: { url: data.dl_url },
+        mimetype,
+        fileName: `${data.title}.${formato.includes('mp3') ? 'mp3' : 'mp4'}`
+      },
+      { quoted: m }
+    )
+
+    await m.react('✅')
+  } catch (e) {
+    console.error(e)
+    await m.react('❌')
+    conn.reply(
+      m.chat,
+      `✖️ *Oops... algo salió mal*\n\n` +
+      `Por favor intenta nuevamente en unos instantes 🥺`,
+      m, rcanal
+    )
+  }
 }
 
-let handler = async (m, { text, conn, command }) => {
-if (!text) return m.reply('🔍 Ingresa el nombre del video. Ejemplo: .play2 Usewa Ado');
+handler.help = ['play2 <formato> <búsqueda>']
+handler.tags = ['download']
+handler.command = ['ytplay', 'play2']
+export default handler
 
-try {
-const searchAPI = decryptBase64(ENCRYPTED_SEARCH_API);
-const downloadVideoAPI = decryptBase64(ENCRYPTED_DOWNLOAD_VIDEO_API);
-
-const searchRes = await fetch(`${searchAPI}${encodeURIComponent(text)}`);  
-const searchJson = await searchRes.json();  
-
-if (!searchJson.results || !searchJson.results.length) {  
-  return m.reply('⚠️ No se encontraron resultados para tu búsqueda.');  
-}  
-
-const video = searchJson.results[0];  
-const thumb = video.thumbnails.find(t => t.width === 720)?.url || video.thumbnails[0]?.url;  
-const videoTitle = video.title;  
-const videoUrl = video.url;  
-const duration = Math.floor(video.duration);  
-
-const msgInfo = `${videoTitle}
-📺 Canal: ${video.channel}
-⏱️ Duración: ${duration}s
-👀 Vistas: ${video.views.toLocaleString()}
-🔗 URL: ${videoUrl}
-Enviando video un momento soy lenta (˶˃ ᵕ ˂˶)...
-`.trim();
-
-await conn.sendMessage(m.chat, { image: { url: thumb }, caption: msgInfo }, { quoted: m });  
-
-const downloadRes = await fetch(`${downloadVideoAPI}${encodeURIComponent(videoUrl)}`);  
-const downloadJson = await downloadRes.json();  
-
-if (!downloadJson.file_url) return m.reply('❌ No se pudo descargar el video.');  
-
-await conn.sendMessage(m.chat, {  
-  video: { url: downloadJson.file_url },  
-  mimetype: 'video/mp4',  
-  fileName: `${downloadJson.title}.mp4`  
-}, { quoted: m });
-
-} catch (e) {
-console.error(e);
-m.reply('❌ Error al procesar tu solicitud.');
+function eYear(txt) {
+  if (!txt) return '×'
+  const replacements = [
+    ['month ago', 'mes'], ['months ago', 'meses'],
+    ['year ago', 'año'], ['years ago', 'años'],
+    ['hour ago', 'hora'], ['hours ago', 'horas'],
+    ['minute ago', 'minuto'], ['minutes ago', 'minutos'],
+    ['day ago', 'día'], ['days ago', 'días']
+  ]
+  for (const [en, es] of replacements) {
+    if (txt.includes(en)) return 'hace ' + txt.replace(en, es).trim()
+  }
+  return txt
 }
-};
 
-handler.command = ['play2','mp4','ytmp4','playmp4'];
-handler.help = ['play2 <video>'];
-handler.tags = ['downloader'];
-
-export default handler;
+function formatNumber(number) {
+  return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
