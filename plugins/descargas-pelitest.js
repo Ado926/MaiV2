@@ -1,55 +1,73 @@
 import ytdl from 'ytdl-core';
 import fs from 'fs';
 import path from 'path';
-import { exec } from 'child_process';
-import { tmpdir } from 'os';
-import { randomUUID } from 'crypto';
+import os from 'os';
 
-let handler = async (m, { conn, args, command }) => {
+let handler = async (m, { conn, args }) => {
   const url = args[0];
-  if (!url || !ytdl.validateURL(url)) return m.reply('❗ Ingresa un enlace válido de YouTube.');
+  if (!url || !ytdl.validateURL(url)) {
+    return m.reply('❗ Por favor ingresa un enlace válido de YouTube.');
+  }
 
   await conn.sendMessage(m.chat, { react: { text: '📥', key: m.key } });
-  m.reply('📡 *Procesando video, espera unos segundos...*');
+  const statusMsg = await conn.sendMessage(m.chat, { text: '📡 *Procesando… descarga en curso…*' }, { quoted: m });
 
   try {
     const info = await ytdl.getInfo(url);
-    const title = info.videoDetails.title;
-    const format = ytdl.chooseFormat(info.formats, { quality: 'highest', filter: 'audioandvideo' });
-    const fileSize = parseInt(format.contentLength || '0');
+    const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudioandvideo' });
 
-    const MAX_SIZE = 600 * 1024 * 1024;
-    if (fileSize > MAX_SIZE) return m.reply('❌ El video excede los 600 MB permitidos.');
+    const MAX_BYTES = 600 * 1024 * 1024;
+    const fileSize = format.contentLength ? parseInt(format.contentLength) : 0;
 
-    const fileName = `${randomUUID()}.mp4`;
-    const filePath = path.join(tmpdir(), fileName);
+    if (fileSize && fileSize > MAX_BYTES) {
+      await conn.sendMessage(m.chat, { text: '❌ El video excede los 600 MB permitidos.' }, { quoted: statusMsg });
+      return;
+    }
 
-    const videoStream = ytdl(url, { quality: 'highest', filter: 'audioandvideo' });
-
-    const fileWriteStream = fs.createWriteStream(filePath);
-    videoStream.pipe(fileWriteStream);
+    const filename = `${Date.now()}_${info.videoDetails.videoId}.mp4`;
+    const filepath = path.join(os.tmpdir(), filename);
+    const writeStream = fs.createWriteStream(filepath);
 
     await new Promise((resolve, reject) => {
-      fileWriteStream.on('finish', resolve);
-      fileWriteStream.on('error', reject);
+      const stream = ytdl(url, { quality: format.itag });
+
+      let downloaded = 0;
+      stream.on('data', chunk => {
+        downloaded += chunk.length;
+        if (downloaded > MAX_BYTES) {
+          stream.destroy();
+          writeStream.close();
+          return reject(new Error('Límite excedido'));
+        }
+      });
+
+      stream.on('error', err => reject(err));
+      writeStream.on('error', err => reject(err));
+      writeStream.on('finish', resolve);
+      stream.pipe(writeStream);
     });
 
     await conn.sendMessage(m.chat, {
-      document: fs.readFileSync(filePath),
-      fileName: `${title}.mp4`,
+      document: fs.readFileSync(filepath),
+      fileName: `${info.videoDetails.title}.mp4`,
       mimetype: 'video/mp4',
-      caption: `🎬 *${title}*\n🗂️ Enviado como documento (calidad máxima)`
+      caption: `🎬 *${info.videoDetails.title}*\n📦 Enviado como documento`,
     }, { quoted: m });
 
-    fs.unlinkSync(filePath); // Limpieza
+    fs.unlinkSync(filepath);
+    await conn.sendMessage(m.chat, { text: '✅ Video enviado con éxito.' }, { quoted: m });
+
   } catch (e) {
     console.error(e);
-    m.reply('❌ Error al descargar o enviar el video.');
+    const errMsg = e.message.includes('Límite excedido')
+      ? '❌ El video excede los 600 MB!'
+      : '❌ Error durante descarga o envío.';
+    await conn.sendMessage(m.chat, { text: errMsg }, { quoted: m });
   }
 };
 
 handler.command = ['ytbigdoc'];
-handler.help = ['ytbigdoc <enlace>'];
 handler.tags = ['downloader'];
+handler.help = ['ytbigdoc <enlace de YouTube>'];
 
 export default handler;
