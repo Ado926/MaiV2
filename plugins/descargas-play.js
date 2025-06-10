@@ -26,14 +26,18 @@ let handler = async (m, { text, conn, command }) => {
     const videoTitle = video.title;
     const videoUrl = video.url;
     const duration = Math.floor(video.duration);
+    const channel = video.channel || 'Desconocido';
+    const views = video.views ? video.views.toLocaleString() : 'N/A';
 
     const msgInfo = `
-🎬 *Título:* ${videoTitle}
-📺 *Canal:* ${video.channel}
-⏱️ *Duración:* ${duration}s
-👀 *Vistas:* ${video.views.toLocaleString()}
-🔗 *URL:* ${videoUrl}
-_Enviando video un momento soy lenta (˶˃ ᵕ ˂˶)..._
+┏━━━━━━━━━━━━━━⬣
+┃ 🎬 *Título:* ${videoTitle}
+┃ 📺 *Canal:* ${channel}
+┃ ⏱️ *Duración:* ${duration}s
+┃ 👁️ *Vistas:* ${views}
+┃ 🔗 *URL:* ${videoUrl}
+┗━━━━━━━━━━━━━━⬣
+📥 *Enviando video...* Un momento, soy un poco lenta (˶˃ ᵕ ˂˶)
 `.trim();
 
     await conn.sendMessage(m.chat, { image: { url: thumb }, caption: msgInfo }, { quoted: m });
@@ -43,8 +47,20 @@ _Enviando video un momento soy lenta (˶˃ ᵕ ˂˶)..._
 
     if (!downloadJson.file_url) return m.reply('❌ No se pudo descargar el video.');
 
+    // Verificar tamaño
+    const headRes = await fetch(downloadJson.file_url, { method: 'HEAD' });
+    const fileSize = parseInt(headRes.headers.get('content-length')) || 0;
+    const MAX_SIZE = 600 * 1024 * 1024;
+    const LIMIT_DIRECT = 89 * 1024 * 1024;
+
+    if (fileSize > MAX_SIZE) {
+      return m.reply('❌ El video excede el límite de 600 MB.');
+    }
+
+    const asDocument = fileSize > LIMIT_DIRECT;
+
     await conn.sendMessage(m.chat, {
-      video: { url: downloadJson.file_url },
+      [asDocument ? 'document' : 'video']: { url: downloadJson.file_url },
       mimetype: 'video/mp4',
       fileName: `${downloadJson.title}.mp4`
     }, { quoted: m });
@@ -55,7 +71,7 @@ _Enviando video un momento soy lenta (˶˃ ᵕ ˂˶)..._
   }
 };
 
-handler.command = ['play2','mp4','ytmp4','playmp4'];
+handler.command = ['play2', 'mp4', 'ytmp4', 'playmp4'];
 handler.help = ['play2 <video>'];
 handler.tags = ['downloader'];
 
