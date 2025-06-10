@@ -7,13 +7,22 @@ function decryptBase64(str) {
   return Buffer.from(str, 'base64').toString();
 }
 
-let handler = async (m, { text, conn, command }) => {
-  if (!text) return m.reply('🔍 Ingresa el nombre del video. Ejemplo: *.play2 Usewa Ado*');
+let handler = async (m, { text, conn }) => {
+  if (!text) return m.reply('🎬 Ingresa el nombre del video. Ejemplo: *.play2 Usewa Ado*');
+
+  // Reacción al mensaje
+  await conn.sendMessage(m.chat, { react: { text: '🎥', key: m.key } });
 
   try {
     const searchAPI = decryptBase64(ENCRYPTED_SEARCH_API);
     const downloadVideoAPI = decryptBase64(ENCRYPTED_DOWNLOAD_VIDEO_API);
 
+    // Mensaje visual mientras busca
+    await conn.sendMessage(m.chat, {
+      text: '🔍 *Buscando tu video...* \nEspera un momento por favor...',
+    }, { quoted: m });
+
+    // Buscar video
     const searchRes = await fetch(`${searchAPI}${encodeURIComponent(text)}`);
     const searchJson = await searchRes.json();
 
@@ -30,18 +39,19 @@ let handler = async (m, { text, conn, command }) => {
     const views = video.views ? video.views.toLocaleString() : 'N/A';
 
     const msgInfo = `
-┏━━━━━━━━━━━━━━⬣
-┃ 🎬 *Título:* ${videoTitle}
+╭━━🎞️ *INFORMACIÓN DEL VIDEO* 🎞️━━╮
+┃ 📌 *Título:* ${videoTitle}
 ┃ 📺 *Canal:* ${channel}
 ┃ ⏱️ *Duración:* ${duration}s
 ┃ 👁️ *Vistas:* ${views}
 ┃ 🔗 *URL:* ${videoUrl}
-┗━━━━━━━━━━━━━━⬣
-📥 *Enviando video...* Un momento, soy un poco lenta (˶˃ ᵕ ˂˶)
+╰━━━━━━━━━━━━━━━━━━━━━━━╯
+📥 *Enviando video...*
 `.trim();
 
     await conn.sendMessage(m.chat, { image: { url: thumb }, caption: msgInfo }, { quoted: m });
 
+    // Descargar video
     const downloadRes = await fetch(`${downloadVideoAPI}${encodeURIComponent(videoUrl)}`);
     const downloadJson = await downloadRes.json();
 
@@ -50,19 +60,20 @@ let handler = async (m, { text, conn, command }) => {
     // Verificar tamaño
     const headRes = await fetch(downloadJson.file_url, { method: 'HEAD' });
     const fileSize = parseInt(headRes.headers.get('content-length')) || 0;
-    const MAX_SIZE = 600 * 1024 * 1024;
-    const LIMIT_DIRECT = 89 * 1024 * 1024;
+    const MAX_SIZE = 600 * 1024 * 1024; // 600 MB
+    const LIMIT_DIRECT = 89 * 1024 * 1024; // 89 MB
 
     if (fileSize > MAX_SIZE) {
       return m.reply('❌ El video excede el límite de 600 MB.');
     }
 
-    const asDocument = fileSize > LIMIT_DIRECT;
+    const sendAsDoc = fileSize > LIMIT_DIRECT;
 
     await conn.sendMessage(m.chat, {
-      [asDocument ? 'document' : 'video']: { url: downloadJson.file_url },
+      [sendAsDoc ? 'document' : 'video']: { url: downloadJson.file_url },
       mimetype: 'video/mp4',
-      fileName: `${downloadJson.title}.mp4`
+      fileName: `${videoTitle}.mp4`,
+      caption: sendAsDoc ? undefined : `🎬 ${videoTitle}`,
     }, { quoted: m });
 
   } catch (e) {
@@ -72,7 +83,7 @@ let handler = async (m, { text, conn, command }) => {
 };
 
 handler.command = ['play2', 'mp4', 'ytmp4', 'playmp4'];
-handler.help = ['play2 <video>'];
+handler.help = ['play2 <nombre del video>'];
 handler.tags = ['downloader'];
 
 export default handler;
