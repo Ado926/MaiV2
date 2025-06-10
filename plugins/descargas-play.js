@@ -39,13 +39,13 @@ let handler = async (m, { text, conn }) => {
     const views = video.views ? video.views.toLocaleString() : 'N/A';
 
     const msgInfo = `
-╭━━🎞️ *INFORMACIÓN DEL VIDEO* 🎞️━━╮
+╭━👤 *INFO DEL VIDEO* 👤━╮
 ┃ 📌 *Título:* ${videoTitle}
 ┃ 📺 *Canal:* ${channel}
 ┃ ⏱️ *Duración:* ${duration}s
 ┃ 👁️ *Vistas:* ${views}
 ┃ 🔗 *URL:* ${videoUrl}
-╰━━━━━━━━━━━━━━━━━━━━━━━╯
+╰━━━━━━━━━━━━━━━━━╯
 📥 *Enviando video...*
 `.trim();
 
